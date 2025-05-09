@@ -2,45 +2,64 @@ imports:
   feature: feature.yml
 types:
   ReadmeConfig:
-    docs: |
-      The configuration used to generate a README.md file.
-
-      The information described here is a combination of user-defined information
-      (i.e. specified in the generators.yml), and dynamically generated information
-      that comes from each generator (i.e. features, requirements, and more).
     properties:
+      remote:
+        type: optional<Remote>
+        docs: >
+          If specified, the original README.md will be fetched from this remote
+          (if it exists).
       language: LanguageInfo
       organization: string
       bannerLink: optional<string>
-      docsLink: optional<string>
+      introduction: optional<string>
+      apiReferenceLink: optional<string>
+      referenceMarkdownPath: optional<string>
       requirements: optional<list<string>>
       features:
+        type: optional<list<ReadmeFeature>>
         docs: |
           Specifies the list of features supported by a specific generator.
           The features are rendered in the order they're specified.
-        type: optional<list<ReadmeFeature>>
+    docs: >
+      The configuration used to generate a README.md file.
 
-  ReadmeFeature:
+      The information described here is a combination of user-defined
+      information
+
+      (i.e. specified in the generators.yml), and dynamically generated
+      information
+
+      that comes from each generator (i.e. features, requirements, and more).
+  Remote:
+    union:
+      github: GithubRemote
     docs: |
-      A single feature supported by a generator (e.g. PAGINATION).
+      The remote where the README.md is hosted.
+  GithubRemote:
     properties:
-      id: feature.FeatureId
-      description: optional<string>
-      addendum: optional<string>
+      repoUrl:
+        type: string
+        docs: A full repo url (i.e. https://github.com/fern-api/fern)
+      installationToken:
+        type: string
+        docs: The token used to clone the GitHub repository.
+  ReadmeFeature:
+    extends: feature.FeatureSpec
+    properties:
       snippets: optional<list<string>>
       snippetsAreOptional:
-        docs: |
-          If true, the feature block should be rendered even if we don't receive a snippet for it.
-          This is useful for features that are always supported, but might not require a snippet
-          to explain.
         type: boolean
+        docs: >
+          If true, the feature block should be rendered even if we don't receive
+          a snippet for it.
 
-  LanguageInfo:
+          This is useful for features that are always supported, but might not
+          require a snippet
+
+          to explain.
     docs: |
-      The language and its associated publish information (if any).
-
-      This is used to generate badges, the installation guide, and determine what language to
-      use when surrounding the snippets in a code block.
+      A single feature supported by a generator (e.g. PAGINATION).
+  LanguageInfo:
     union:
       typescript: TypescriptInfo
       python: PythonInfo
@@ -48,67 +67,50 @@ types:
       java: JavaInfo
       ruby: RubyInfo
       csharp: CsharpInfo
+    docs: >
+      The language and its associated publish information (if any).
 
+      This is used to generate badges, the installation guide, and determine
+      what language to
+
+      use when surrounding the snippets in a code block.
   TypescriptInfo:
     properties:
-      title: literal<"TypeScript">
-      format: literal<"ts">
       publishInfo: optional<NpmPublishInfo>
-
   PythonInfo:
     properties:
-      title: literal<"Python">
-      format: literal<"python">
       publishInfo: optional<PypiPublishInfo>
-
   GoInfo:
     properties:
-      title: literal<"Go">
-      format: literal<"go">
       publishInfo: optional<GoPublishInfo>
-
   JavaInfo:
     properties:
-      title: literal<"Java">
-      format: literal<"java">
       publishInfo: optional<MavenPublishInfo>
-
   RubyInfo:
     properties:
-      title: literal<"Ruby">
-      format: literal<"ruby">
       publishInfo: optional<RubyGemsPublishInfo>
-
   CsharpInfo:
     properties:
-      title: literal<"C#">
-      format: literal<"csharp">
       publishInfo: optional<NugetPublishInfo>
-
   NpmPublishInfo:
     properties:
       packageName: string
-
   PypiPublishInfo:
     properties:
       packageName: string
-
   GoPublishInfo:
     properties:
       owner: string
       repo: string
       version: string
-
   MavenPublishInfo:
     properties:
       artifact: string
       group: string
       version: string
-
   RubyGemsPublishInfo:
     properties:
       packageName: string
-
   NugetPublishInfo:
     properties:
       packageName: string

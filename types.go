@@ -54,17 +54,60 @@ func (f *FeatureConfig) String() string {
 }
 
 // A unique identifier for a feature (e.g. OPTIONALS). This is typed as a freeform string
-// to allow for arbitrary features, but callers are expected to use the FeatureType
+// to allow for arbitrary features, but callers are expected to use the StructuredFeatureId
 // string representation whenever possible.
-type FeatureId = string
+type FeatureId struct {
+	String              string
+	StructuredFeatureId StructuredFeatureId
+}
+
+func (f *FeatureId) UnmarshalJSON(data []byte) error {
+	var valueString string
+	if err := json.Unmarshal(data, &valueString); err == nil {
+		f.String = valueString
+		return nil
+	}
+	var valueStructuredFeatureId StructuredFeatureId
+	if err := json.Unmarshal(data, &valueStructuredFeatureId); err == nil {
+		f.StructuredFeatureId = valueStructuredFeatureId
+		return nil
+	}
+	return fmt.Errorf("%s cannot be deserialized as a %T", data, f)
+}
+
+func (f FeatureId) MarshalJSON() ([]byte, error) {
+	if f.String != "" {
+		return json.Marshal(f.String)
+	}
+	if f.StructuredFeatureId != "" {
+		return json.Marshal(f.StructuredFeatureId)
+	}
+	return nil, fmt.Errorf("type %T does not include a non-empty union type", f)
+}
+
+type FeatureIdVisitor interface {
+	VisitString(string) error
+	VisitStructuredFeatureId(StructuredFeatureId) error
+}
+
+func (f *FeatureId) Accept(visitor FeatureIdVisitor) error {
+	if f.String != "" {
+		return visitor.VisitString(f.String)
+	}
+	if f.StructuredFeatureId != "" {
+		return visitor.VisitStructuredFeatureId(f.StructuredFeatureId)
+	}
+	return fmt.Errorf("type %T does not include a non-empty union type", f)
+}
 
 // A specification for a feature supported by a generator. This includes the
 // feature's ID, a description, and any additional information that should be
 // included in the README.md.
 type FeatureSpec struct {
-	Id          FeatureId `json:"id" url:"id"`
-	Description *string   `json:"description,omitempty" url:"description,omitempty"`
-	Addendum    *string   `json:"addendum,omitempty" url:"addendum,omitempty"`
+	Id          *FeatureId `json:"id,omitempty" url:"id,omitempty"`
+	Description *string    `json:"description,omitempty" url:"description,omitempty"`
+	Addendum    *string    `json:"addendum,omitempty" url:"addendum,omitempty"`
+	Advanced    *bool      `json:"advanced,omitempty" url:"advanced,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -105,50 +148,100 @@ func (f *FeatureSpec) String() string {
 }
 
 // Unique identifiers for features that can be demonstrated with snippets.
-type FeatureType string
+type StructuredFeatureId string
 
 const (
-	FeatureTypeAuthentication FeatureType = "AUTHENTICATION"
-	FeatureTypeErrors         FeatureType = "ERRORS"
-	FeatureTypeUsage          FeatureType = "USAGE"
-	FeatureTypePagination     FeatureType = "PAGINATION"
-	FeatureTypeRetries        FeatureType = "RETRIES"
-	FeatureTypeRequestOptions FeatureType = "REQUEST_OPTIONS"
-	FeatureTypeStreaming      FeatureType = "STREAMING"
-	FeatureTypeTimeouts       FeatureType = "TIMEOUTS"
+	StructuredFeatureIdAuthentication StructuredFeatureId = "AUTHENTICATION"
+	StructuredFeatureIdErrors         StructuredFeatureId = "ERRORS"
+	StructuredFeatureIdUsage          StructuredFeatureId = "USAGE"
+	StructuredFeatureIdPagination     StructuredFeatureId = "PAGINATION"
+	StructuredFeatureIdRetries        StructuredFeatureId = "RETRIES"
+	StructuredFeatureIdRequestOptions StructuredFeatureId = "REQUEST_OPTIONS"
+	StructuredFeatureIdStreaming      StructuredFeatureId = "STREAMING"
+	StructuredFeatureIdTimeouts       StructuredFeatureId = "TIMEOUTS"
+	StructuredFeatureIdCustomClient   StructuredFeatureId = "CUSTOM_CLIENT"
 )
 
-func NewFeatureTypeFromString(s string) (FeatureType, error) {
+func NewStructuredFeatureIdFromString(s string) (StructuredFeatureId, error) {
 	switch s {
 	case "AUTHENTICATION":
-		return FeatureTypeAuthentication, nil
+		return StructuredFeatureIdAuthentication, nil
 	case "ERRORS":
-		return FeatureTypeErrors, nil
+		return StructuredFeatureIdErrors, nil
 	case "USAGE":
-		return FeatureTypeUsage, nil
+		return StructuredFeatureIdUsage, nil
 	case "PAGINATION":
-		return FeatureTypePagination, nil
+		return StructuredFeatureIdPagination, nil
 	case "RETRIES":
-		return FeatureTypeRetries, nil
+		return StructuredFeatureIdRetries, nil
 	case "REQUEST_OPTIONS":
-		return FeatureTypeRequestOptions, nil
+		return StructuredFeatureIdRequestOptions, nil
 	case "STREAMING":
-		return FeatureTypeStreaming, nil
+		return StructuredFeatureIdStreaming, nil
 	case "TIMEOUTS":
-		return FeatureTypeTimeouts, nil
+		return StructuredFeatureIdTimeouts, nil
+	case "CUSTOM_CLIENT":
+		return StructuredFeatureIdCustomClient, nil
 	}
-	var t FeatureType
+	var t StructuredFeatureId
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
 }
 
-func (f FeatureType) Ptr() *FeatureType {
-	return &f
+func (s StructuredFeatureId) Ptr() *StructuredFeatureId {
+	return &s
+}
+
+// The configuration used to interact with a GitHub repository.
+type GitHubConfig struct {
+	// The directory from which to read the contents of the GitHub repository.
+	SourceDirectory string `json:"sourceDirectory" url:"sourceDirectory"`
+	// The URI of the GitHub repository.
+	Uri string `json:"uri" url:"uri"`
+	// The token used to access the GitHub repository.
+	Token string `json:"token" url:"token"`
+	// The branch to use when interacting with the GitHub repository.
+	Branch *string `json:"branch,omitempty" url:"branch,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (g *GitHubConfig) GetExtraProperties() map[string]interface{} {
+	return g.extraProperties
+}
+
+func (g *GitHubConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler GitHubConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*g = GitHubConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *g)
+	if err != nil {
+		return err
+	}
+	g.extraProperties = extraProperties
+
+	g._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (g *GitHubConfig) String() string {
+	if len(g._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(g._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(g); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", g)
 }
 
 type CsharpInfo struct {
 	PublishInfo *NugetPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -158,29 +251,15 @@ func (c *CsharpInfo) GetExtraProperties() map[string]interface{} {
 	return c.extraProperties
 }
 
-func (c *CsharpInfo) Title() string {
-	return c.title
-}
-
-func (c *CsharpInfo) Format() string {
-	return c.format
-}
-
 func (c *CsharpInfo) UnmarshalJSON(data []byte) error {
-	type embed CsharpInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*c),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+	type unmarshaler CsharpInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*c = CsharpInfo(unmarshaler.embed)
-	c.title = "C#"
-	c.format = "csharp"
+	*c = CsharpInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *c, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *c)
 	if err != nil {
 		return err
 	}
@@ -188,20 +267,6 @@ func (c *CsharpInfo) UnmarshalJSON(data []byte) error {
 
 	c._rawJSON = json.RawMessage(data)
 	return nil
-}
-
-func (c *CsharpInfo) MarshalJSON() ([]byte, error) {
-	type embed CsharpInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*c),
-		Title:  "C#",
-		Format: "csharp",
-	}
-	return json.Marshal(marshaler)
 }
 
 func (c *CsharpInfo) String() string {
@@ -216,42 +281,29 @@ func (c *CsharpInfo) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-type GoInfo struct {
-	PublishInfo *GoPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
+type GithubRemote struct {
+	// A full repo url (i.e. https://github.com/fern-api/fern)
+	RepoUrl string `json:"repoUrl" url:"repoUrl"`
+	// The token used to clone the GitHub repository.
+	InstallationToken string `json:"installationToken" url:"installationToken"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
 }
 
-func (g *GoInfo) GetExtraProperties() map[string]interface{} {
+func (g *GithubRemote) GetExtraProperties() map[string]interface{} {
 	return g.extraProperties
 }
 
-func (g *GoInfo) Title() string {
-	return g.title
-}
-
-func (g *GoInfo) Format() string {
-	return g.format
-}
-
-func (g *GoInfo) UnmarshalJSON(data []byte) error {
-	type embed GoInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*g),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+func (g *GithubRemote) UnmarshalJSON(data []byte) error {
+	type unmarshaler GithubRemote
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*g = GoInfo(unmarshaler.embed)
-	g.title = "Go"
-	g.format = "go"
+	*g = GithubRemote(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *g, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *g)
 	if err != nil {
 		return err
 	}
@@ -261,18 +313,45 @@ func (g *GoInfo) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (g *GoInfo) MarshalJSON() ([]byte, error) {
-	type embed GoInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*g),
-		Title:  "Go",
-		Format: "go",
+func (g *GithubRemote) String() string {
+	if len(g._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(g._rawJSON); err == nil {
+			return value
+		}
 	}
-	return json.Marshal(marshaler)
+	if value, err := core.StringifyJSON(g); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", g)
+}
+
+type GoInfo struct {
+	PublishInfo *GoPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (g *GoInfo) GetExtraProperties() map[string]interface{} {
+	return g.extraProperties
+}
+
+func (g *GoInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler GoInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*g = GoInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *g)
+	if err != nil {
+		return err
+	}
+	g.extraProperties = extraProperties
+
+	g._rawJSON = json.RawMessage(data)
+	return nil
 }
 
 func (g *GoInfo) String() string {
@@ -332,8 +411,6 @@ func (g *GoPublishInfo) String() string {
 
 type JavaInfo struct {
 	PublishInfo *MavenPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -343,29 +420,15 @@ func (j *JavaInfo) GetExtraProperties() map[string]interface{} {
 	return j.extraProperties
 }
 
-func (j *JavaInfo) Title() string {
-	return j.title
-}
-
-func (j *JavaInfo) Format() string {
-	return j.format
-}
-
 func (j *JavaInfo) UnmarshalJSON(data []byte) error {
-	type embed JavaInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*j),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+	type unmarshaler JavaInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*j = JavaInfo(unmarshaler.embed)
-	j.title = "Java"
-	j.format = "java"
+	*j = JavaInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *j, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *j)
 	if err != nil {
 		return err
 	}
@@ -373,20 +436,6 @@ func (j *JavaInfo) UnmarshalJSON(data []byte) error {
 
 	j._rawJSON = json.RawMessage(data)
 	return nil
-}
-
-func (j *JavaInfo) MarshalJSON() ([]byte, error) {
-	type embed JavaInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*j),
-		Title:  "Java",
-		Format: "java",
-	}
-	return json.Marshal(marshaler)
 }
 
 func (j *JavaInfo) String() string {
@@ -402,7 +451,6 @@ func (j *JavaInfo) String() string {
 }
 
 // The language and its associated publish information (if any).
-//
 // This is used to generate badges, the installation guide, and determine what language to
 // use when surrounding the snippets in a code block.
 type LanguageInfo struct {
@@ -685,8 +733,6 @@ func (p *PypiPublishInfo) String() string {
 
 type PythonInfo struct {
 	PublishInfo *PypiPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -696,29 +742,15 @@ func (p *PythonInfo) GetExtraProperties() map[string]interface{} {
 	return p.extraProperties
 }
 
-func (p *PythonInfo) Title() string {
-	return p.title
-}
-
-func (p *PythonInfo) Format() string {
-	return p.format
-}
-
 func (p *PythonInfo) UnmarshalJSON(data []byte) error {
-	type embed PythonInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*p),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+	type unmarshaler PythonInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*p = PythonInfo(unmarshaler.embed)
-	p.title = "Python"
-	p.format = "python"
+	*p = PythonInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *p, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *p)
 	if err != nil {
 		return err
 	}
@@ -726,20 +758,6 @@ func (p *PythonInfo) UnmarshalJSON(data []byte) error {
 
 	p._rawJSON = json.RawMessage(data)
 	return nil
-}
-
-func (p *PythonInfo) MarshalJSON() ([]byte, error) {
-	type embed PythonInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*p),
-		Title:  "Python",
-		Format: "python",
-	}
-	return json.Marshal(marshaler)
 }
 
 func (p *PythonInfo) String() string {
@@ -755,16 +773,19 @@ func (p *PythonInfo) String() string {
 }
 
 // The configuration used to generate a README.md file.
-//
 // The information described here is a combination of user-defined information
 // (i.e. specified in the generators.yml), and dynamically generated information
 // that comes from each generator (i.e. features, requirements, and more).
 type ReadmeConfig struct {
-	Language     *LanguageInfo `json:"language,omitempty" url:"language,omitempty"`
-	Organization string        `json:"organization" url:"organization"`
-	BannerLink   *string       `json:"bannerLink,omitempty" url:"bannerLink,omitempty"`
-	DocsLink     *string       `json:"docsLink,omitempty" url:"docsLink,omitempty"`
-	Requirements []string      `json:"requirements,omitempty" url:"requirements,omitempty"`
+	// If specified, the original README.md will be fetched from this remote (if it exists).
+	Remote                *Remote       `json:"remote,omitempty" url:"remote,omitempty"`
+	Language              *LanguageInfo `json:"language,omitempty" url:"language,omitempty"`
+	Organization          string        `json:"organization" url:"organization"`
+	BannerLink            *string       `json:"bannerLink,omitempty" url:"bannerLink,omitempty"`
+	Introduction          *string       `json:"introduction,omitempty" url:"introduction,omitempty"`
+	ApiReferenceLink      *string       `json:"apiReferenceLink,omitempty" url:"apiReferenceLink,omitempty"`
+	ReferenceMarkdownPath *string       `json:"referenceMarkdownPath,omitempty" url:"referenceMarkdownPath,omitempty"`
+	Requirements          []string      `json:"requirements,omitempty" url:"requirements,omitempty"`
 	// Specifies the list of features supported by a specific generator.
 	// The features are rendered in the order they're specified.
 	Features []*ReadmeFeature `json:"features,omitempty" url:"features,omitempty"`
@@ -809,10 +830,11 @@ func (r *ReadmeConfig) String() string {
 
 // A single feature supported by a generator (e.g. PAGINATION).
 type ReadmeFeature struct {
-	Id          FeatureId `json:"id" url:"id"`
-	Description *string   `json:"description,omitempty" url:"description,omitempty"`
-	Addendum    *string   `json:"addendum,omitempty" url:"addendum,omitempty"`
-	Snippets    []string  `json:"snippets,omitempty" url:"snippets,omitempty"`
+	Id          *FeatureId `json:"id,omitempty" url:"id,omitempty"`
+	Description *string    `json:"description,omitempty" url:"description,omitempty"`
+	Addendum    *string    `json:"addendum,omitempty" url:"addendum,omitempty"`
+	Advanced    *bool      `json:"advanced,omitempty" url:"advanced,omitempty"`
+	Snippets    []string   `json:"snippets,omitempty" url:"snippets,omitempty"`
 	// If true, the feature block should be rendered even if we don't receive a snippet for it.
 	// This is useful for features that are always supported, but might not require a snippet
 	// to explain.
@@ -854,6 +876,49 @@ func (r *ReadmeFeature) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", r)
+}
+
+// The remote where the README.md is hosted.
+type Remote struct {
+	Type   string
+	Github *GithubRemote
+}
+
+func (r *Remote) UnmarshalJSON(data []byte) error {
+	var unmarshaler struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	r.Type = unmarshaler.Type
+	switch unmarshaler.Type {
+	case "github":
+		value := new(GithubRemote)
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.Github = value
+	}
+	return nil
+}
+
+func (r Remote) MarshalJSON() ([]byte, error) {
+	if r.Github != nil {
+		return core.MarshalJSONWithExtraProperty(r.Github, "type", "github")
+	}
+	return nil, fmt.Errorf("type %T does not define a non-empty union type", r)
+}
+
+type RemoteVisitor interface {
+	VisitGithub(*GithubRemote) error
+}
+
+func (r *Remote) Accept(visitor RemoteVisitor) error {
+	if r.Github != nil {
+		return visitor.VisitGithub(r.Github)
+	}
+	return fmt.Errorf("type %T does not define a non-empty union type", r)
 }
 
 type RubyGemsPublishInfo struct {
@@ -899,8 +964,6 @@ func (r *RubyGemsPublishInfo) String() string {
 
 type RubyInfo struct {
 	PublishInfo *RubyGemsPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -910,29 +973,15 @@ func (r *RubyInfo) GetExtraProperties() map[string]interface{} {
 	return r.extraProperties
 }
 
-func (r *RubyInfo) Title() string {
-	return r.title
-}
-
-func (r *RubyInfo) Format() string {
-	return r.format
-}
-
 func (r *RubyInfo) UnmarshalJSON(data []byte) error {
-	type embed RubyInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*r),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+	type unmarshaler RubyInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*r = RubyInfo(unmarshaler.embed)
-	r.title = "Ruby"
-	r.format = "ruby"
+	*r = RubyInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *r, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
 	if err != nil {
 		return err
 	}
@@ -940,20 +989,6 @@ func (r *RubyInfo) UnmarshalJSON(data []byte) error {
 
 	r._rawJSON = json.RawMessage(data)
 	return nil
-}
-
-func (r *RubyInfo) MarshalJSON() ([]byte, error) {
-	type embed RubyInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*r),
-		Title:  "Ruby",
-		Format: "ruby",
-	}
-	return json.Marshal(marshaler)
 }
 
 func (r *RubyInfo) String() string {
@@ -970,8 +1005,6 @@ func (r *RubyInfo) String() string {
 
 type TypescriptInfo struct {
 	PublishInfo *NpmPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
-	title       string
-	format      string
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -981,29 +1014,15 @@ func (t *TypescriptInfo) GetExtraProperties() map[string]interface{} {
 	return t.extraProperties
 }
 
-func (t *TypescriptInfo) Title() string {
-	return t.title
-}
-
-func (t *TypescriptInfo) Format() string {
-	return t.format
-}
-
 func (t *TypescriptInfo) UnmarshalJSON(data []byte) error {
-	type embed TypescriptInfo
-	var unmarshaler = struct {
-		embed
-	}{
-		embed: embed(*t),
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+	type unmarshaler TypescriptInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*t = TypescriptInfo(unmarshaler.embed)
-	t.title = "TypeScript"
-	t.format = "ts"
+	*t = TypescriptInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *t, "title", "format")
+	extraProperties, err := core.ExtractExtraProperties(data, *t)
 	if err != nil {
 		return err
 	}
@@ -1011,20 +1030,6 @@ func (t *TypescriptInfo) UnmarshalJSON(data []byte) error {
 
 	t._rawJSON = json.RawMessage(data)
 	return nil
-}
-
-func (t *TypescriptInfo) MarshalJSON() ([]byte, error) {
-	type embed TypescriptInfo
-	var marshaler = struct {
-		embed
-		Title  string `json:"title"`
-		Format string `json:"format"`
-	}{
-		embed:  embed(*t),
-		Title:  "TypeScript",
-		Format: "ts",
-	}
-	return json.Marshal(marshaler)
 }
 
 func (t *TypescriptInfo) String() string {
@@ -1037,4 +1042,403 @@ func (t *TypescriptInfo) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", t)
+}
+
+type EndpointReference struct {
+	// The title is a code snippet that is shown when the endpoint's reference is collapsed.
+	// For example, `client.subpackage.method({ ...params }) -> ReturnValue`.
+	Title       *MethodInvocationSnippet `json:"title,omitempty" url:"title,omitempty"`
+	Description *string                  `json:"description,omitempty" url:"description,omitempty"`
+	// A "full" snippet, showing all the parameters, with a full example.
+	// ```typescript
+	//
+	//	await client.subpackage.method({
+	//	    expiresIn: 300,
+	//	});
+	//
+	// ```
+	Snippet    string                `json:"snippet" url:"snippet"`
+	Parameters []*ParameterReference `json:"parameters,omitempty" url:"parameters,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (e *EndpointReference) GetExtraProperties() map[string]interface{} {
+	return e.extraProperties
+}
+
+func (e *EndpointReference) UnmarshalJSON(data []byte) error {
+	type unmarshaler EndpointReference
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*e = EndpointReference(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *e)
+	if err != nil {
+		return err
+	}
+	e.extraProperties = extraProperties
+
+	e._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (e *EndpointReference) String() string {
+	if len(e._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(e._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(e); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", e)
+}
+
+type Language string
+
+const (
+	LanguageJava       Language = "JAVA"
+	LanguagePython     Language = "PYTHON"
+	LanguageGo         Language = "GO"
+	LanguageRuby       Language = "RUBY"
+	LanguageCsharp     Language = "CSHARP"
+	LanguageTypescript Language = "TYPESCRIPT"
+)
+
+func NewLanguageFromString(s string) (Language, error) {
+	switch s {
+	case "JAVA":
+		return LanguageJava, nil
+	case "PYTHON":
+		return LanguagePython, nil
+	case "GO":
+		return LanguageGo, nil
+	case "RUBY":
+		return LanguageRuby, nil
+	case "CSHARP":
+		return LanguageCsharp, nil
+	case "TYPESCRIPT":
+		return LanguageTypescript, nil
+	}
+	var t Language
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (l Language) Ptr() *Language {
+	return &l
+}
+
+type LinkedText struct {
+	Text     string            `json:"text" url:"text"`
+	Location *RelativeLocation `json:"location,omitempty" url:"location,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (l *LinkedText) GetExtraProperties() map[string]interface{} {
+	return l.extraProperties
+}
+
+func (l *LinkedText) UnmarshalJSON(data []byte) error {
+	type unmarshaler LinkedText
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*l = LinkedText(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *l)
+	if err != nil {
+		return err
+	}
+	l.extraProperties = extraProperties
+
+	l._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (l *LinkedText) String() string {
+	if len(l._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(l._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(l); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", l)
+}
+
+// The method invocation snippet is one which appears when the endpoint's reference is collapsed.
+// It is meant to give a high-level overview of the endpoint -- e.g. the method name and it's return value.
+// The snippet itself should be a list of concatable content, which the CLI will handle hyperlinking. Note that this
+// will essentially just be a "".join(snippetParts), so you must handle making sure the right `.`, etc. are in the parts.
+// Note this is a separate object to make it easier to add additional properties down the road, for example if
+// we wanted to be specific about what portion of the snippet we hyperlink, etc.
+type MethodInvocationSnippet struct {
+	SnippetParts []*LinkedText `json:"snippetParts,omitempty" url:"snippetParts,omitempty"`
+	ReturnValue  *LinkedText   `json:"returnValue,omitempty" url:"returnValue,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (m *MethodInvocationSnippet) GetExtraProperties() map[string]interface{} {
+	return m.extraProperties
+}
+
+func (m *MethodInvocationSnippet) UnmarshalJSON(data []byte) error {
+	type unmarshaler MethodInvocationSnippet
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MethodInvocationSnippet(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+
+	m._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MethodInvocationSnippet) String() string {
+	if len(m._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(m._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+type ParameterReference struct {
+	Name        string            `json:"name" url:"name"`
+	Description *string           `json:"description,omitempty" url:"description,omitempty"`
+	Location    *RelativeLocation `json:"location,omitempty" url:"location,omitempty"`
+	Type        string            `json:"type" url:"type"`
+	Required    bool              `json:"required" url:"required"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (p *ParameterReference) GetExtraProperties() map[string]interface{} {
+	return p.extraProperties
+}
+
+func (p *ParameterReference) UnmarshalJSON(data []byte) error {
+	type unmarshaler ParameterReference
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = ParameterReference(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+
+	p._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *ParameterReference) String() string {
+	if len(p._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(p._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
+// The information to include within the `reference.md` file generated by the CLI.
+// The information here should really be all defined by the generator, and not user provided.
+// We intentionally keep this a bit flexible in the event SDKs structure their package/module
+// references in a unique way for the same API.
+type ReferenceConfig struct {
+	RootSection *RootPackageReferenceSection `json:"rootSection,omitempty" url:"rootSection,omitempty"`
+	Sections    []*ReferenceSection          `json:"sections,omitempty" url:"sections,omitempty"`
+	// Similar to in README generation, the language property is used to determine the language to use when generating code blocks in markdown.
+	Language Language `json:"language" url:"language"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *ReferenceConfig) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *ReferenceConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler ReferenceConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = ReferenceConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *ReferenceConfig) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
+type ReferenceSection struct {
+	Title       string               `json:"title" url:"title"`
+	Description *string              `json:"description,omitempty" url:"description,omitempty"`
+	Endpoints   []*EndpointReference `json:"endpoints,omitempty" url:"endpoints,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *ReferenceSection) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *ReferenceSection) UnmarshalJSON(data []byte) error {
+	type unmarshaler ReferenceSection
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = ReferenceSection(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *ReferenceSection) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
+type RelativeLocation struct {
+	// A relative location is a path to a file or directory relative to the root of the repository.
+	// This is used to specify a link for a type or a function that the `reference.md` can point users to.
+	Path string `json:"path" url:"path"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *RelativeLocation) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RelativeLocation) UnmarshalJSON(data []byte) error {
+	type unmarshaler RelativeLocation
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = RelativeLocation(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RelativeLocation) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
+type RootPackageReferenceSection struct {
+	Description *string              `json:"description,omitempty" url:"description,omitempty"`
+	Endpoints   []*EndpointReference `json:"endpoints,omitempty" url:"endpoints,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *RootPackageReferenceSection) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RootPackageReferenceSection) UnmarshalJSON(data []byte) error {
+	type unmarshaler RootPackageReferenceSection
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = RootPackageReferenceSection(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RootPackageReferenceSection) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
 }
