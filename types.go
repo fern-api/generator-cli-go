@@ -1203,6 +1203,7 @@ const (
 	LanguageRuby       Language = "RUBY"
 	LanguageCsharp     Language = "CSHARP"
 	LanguageTypescript Language = "TYPESCRIPT"
+	LanguagePhp        Language = "PHP"
 )
 
 func NewLanguageFromString(s string) (Language, error) {
@@ -1219,6 +1220,8 @@ func NewLanguageFromString(s string) (Language, error) {
 		return LanguageCsharp, nil
 	case "TYPESCRIPT":
 		return LanguageTypescript, nil
+	case "PHP":
+		return LanguagePhp, nil
 	}
 	var t Language
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
