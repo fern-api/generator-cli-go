@@ -240,6 +240,47 @@ func (g *GitHubConfig) String() string {
 	return fmt.Sprintf("%#v", g)
 }
 
+type ComposerPublishInfo struct {
+	PackageName string `json:"packageName" url:"packageName"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (c *ComposerPublishInfo) GetExtraProperties() map[string]interface{} {
+	return c.extraProperties
+}
+
+func (c *ComposerPublishInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler ComposerPublishInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = ComposerPublishInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+
+	c._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *ComposerPublishInfo) String() string {
+	if len(c._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(c._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
 type CsharpInfo struct {
 	PublishInfo *NugetPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
 
@@ -461,6 +502,7 @@ type LanguageInfo struct {
 	Java       *JavaInfo
 	Ruby       *RubyInfo
 	Csharp     *CsharpInfo
+	Php        *PhpInfo
 }
 
 func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
@@ -508,6 +550,12 @@ func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		l.Csharp = value
+	case "php":
+		value := new(PhpInfo)
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		l.Php = value
 	}
 	return nil
 }
@@ -531,6 +579,9 @@ func (l LanguageInfo) MarshalJSON() ([]byte, error) {
 	if l.Csharp != nil {
 		return core.MarshalJSONWithExtraProperty(l.Csharp, "type", "csharp")
 	}
+	if l.Php != nil {
+		return core.MarshalJSONWithExtraProperty(l.Php, "type", "php")
+	}
 	return nil, fmt.Errorf("type %T does not define a non-empty union type", l)
 }
 
@@ -541,6 +592,7 @@ type LanguageInfoVisitor interface {
 	VisitJava(*JavaInfo) error
 	VisitRuby(*RubyInfo) error
 	VisitCsharp(*CsharpInfo) error
+	VisitPhp(*PhpInfo) error
 }
 
 func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
@@ -561,6 +613,9 @@ func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
 	}
 	if l.Csharp != nil {
 		return visitor.VisitCsharp(l.Csharp)
+	}
+	if l.Php != nil {
+		return visitor.VisitPhp(l.Php)
 	}
 	return fmt.Errorf("type %T does not define a non-empty union type", l)
 }
@@ -688,6 +743,47 @@ func (n *NugetPublishInfo) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", n)
+}
+
+type PhpInfo struct {
+	PublishInfo *ComposerPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (p *PhpInfo) GetExtraProperties() map[string]interface{} {
+	return p.extraProperties
+}
+
+func (p *PhpInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler PhpInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PhpInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+
+	p._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PhpInfo) String() string {
+	if len(p._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(p._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
 }
 
 type PypiPublishInfo struct {
