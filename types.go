@@ -240,6 +240,48 @@ func (g *GitHubConfig) String() string {
 	return fmt.Sprintf("%#v", g)
 }
 
+type CargoPublishInfo struct {
+	PackageName string `json:"packageName" url:"packageName"`
+	Version     string `json:"version" url:"version"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (c *CargoPublishInfo) GetExtraProperties() map[string]interface{} {
+	return c.extraProperties
+}
+
+func (c *CargoPublishInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler CargoPublishInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CargoPublishInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+
+	c._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CargoPublishInfo) String() string {
+	if len(c._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(c._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
 type ComposerPublishInfo struct {
 	PackageName string `json:"packageName" url:"packageName"`
 
@@ -503,6 +545,7 @@ type LanguageInfo struct {
 	Ruby       *RubyInfo
 	Csharp     *CsharpInfo
 	Php        *PhpInfo
+	Rust       *RustInfo
 }
 
 func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
@@ -556,6 +599,12 @@ func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		l.Php = value
+	case "rust":
+		value := new(RustInfo)
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		l.Rust = value
 	}
 	return nil
 }
@@ -582,6 +631,9 @@ func (l LanguageInfo) MarshalJSON() ([]byte, error) {
 	if l.Php != nil {
 		return core.MarshalJSONWithExtraProperty(l.Php, "type", "php")
 	}
+	if l.Rust != nil {
+		return core.MarshalJSONWithExtraProperty(l.Rust, "type", "rust")
+	}
 	return nil, fmt.Errorf("type %T does not define a non-empty union type", l)
 }
 
@@ -593,6 +645,7 @@ type LanguageInfoVisitor interface {
 	VisitRuby(*RubyInfo) error
 	VisitCsharp(*CsharpInfo) error
 	VisitPhp(*PhpInfo) error
+	VisitRust(*RustInfo) error
 }
 
 func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
@@ -616,6 +669,9 @@ func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
 	}
 	if l.Php != nil {
 		return visitor.VisitPhp(l.Php)
+	}
+	if l.Rust != nil {
+		return visitor.VisitRust(l.Rust)
 	}
 	return fmt.Errorf("type %T does not define a non-empty union type", l)
 }
@@ -1099,6 +1155,47 @@ func (r *RubyInfo) String() string {
 	return fmt.Sprintf("%#v", r)
 }
 
+type RustInfo struct {
+	PublishInfo *CargoPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *RustInfo) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RustInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler RustInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = RustInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RustInfo) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
 type TypescriptInfo struct {
 	PublishInfo *NpmPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
 
@@ -1204,6 +1301,7 @@ const (
 	LanguageCsharp     Language = "CSHARP"
 	LanguageTypescript Language = "TYPESCRIPT"
 	LanguagePhp        Language = "PHP"
+	LanguageRust       Language = "RUST"
 )
 
 func NewLanguageFromString(s string) (Language, error) {
@@ -1222,6 +1320,8 @@ func NewLanguageFromString(s string) (Language, error) {
 		return LanguageTypescript, nil
 	case "PHP":
 		return LanguagePhp, nil
+	case "RUST":
+		return LanguageRust, nil
 	}
 	var t Language
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
