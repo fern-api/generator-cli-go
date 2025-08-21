@@ -546,6 +546,7 @@ type LanguageInfo struct {
 	Csharp     *CsharpInfo
 	Php        *PhpInfo
 	Rust       *RustInfo
+	Swift      *SwiftInfo
 }
 
 func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
@@ -605,6 +606,12 @@ func (l *LanguageInfo) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		l.Rust = value
+	case "swift":
+		value := new(SwiftInfo)
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		l.Swift = value
 	}
 	return nil
 }
@@ -634,6 +641,9 @@ func (l LanguageInfo) MarshalJSON() ([]byte, error) {
 	if l.Rust != nil {
 		return core.MarshalJSONWithExtraProperty(l.Rust, "type", "rust")
 	}
+	if l.Swift != nil {
+		return core.MarshalJSONWithExtraProperty(l.Swift, "type", "swift")
+	}
 	return nil, fmt.Errorf("type %T does not define a non-empty union type", l)
 }
 
@@ -646,6 +656,7 @@ type LanguageInfoVisitor interface {
 	VisitCsharp(*CsharpInfo) error
 	VisitPhp(*PhpInfo) error
 	VisitRust(*RustInfo) error
+	VisitSwift(*SwiftInfo) error
 }
 
 func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
@@ -672,6 +683,9 @@ func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
 	}
 	if l.Rust != nil {
 		return visitor.VisitRust(l.Rust)
+	}
+	if l.Swift != nil {
+		return visitor.VisitSwift(l.Swift)
 	}
 	return fmt.Errorf("type %T does not define a non-empty union type", l)
 }
@@ -1196,6 +1210,89 @@ func (r *RustInfo) String() string {
 	return fmt.Sprintf("%#v", r)
 }
 
+type SwiftInfo struct {
+	PublishInfo *SwiftPackageManagerPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (s *SwiftInfo) GetExtraProperties() map[string]interface{} {
+	return s.extraProperties
+}
+
+func (s *SwiftInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler SwiftInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*s = SwiftInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	if err != nil {
+		return err
+	}
+	s.extraProperties = extraProperties
+
+	s._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (s *SwiftInfo) String() string {
+	if len(s._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(s); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", s)
+}
+
+type SwiftPackageManagerPublishInfo struct {
+	GitUrl     string `json:"gitUrl" url:"gitUrl"`
+	MinVersion string `json:"minVersion" url:"minVersion"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (s *SwiftPackageManagerPublishInfo) GetExtraProperties() map[string]interface{} {
+	return s.extraProperties
+}
+
+func (s *SwiftPackageManagerPublishInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler SwiftPackageManagerPublishInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*s = SwiftPackageManagerPublishInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	if err != nil {
+		return err
+	}
+	s.extraProperties = extraProperties
+
+	s._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (s *SwiftPackageManagerPublishInfo) String() string {
+	if len(s._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(s); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", s)
+}
+
 type TypescriptInfo struct {
 	PublishInfo *NpmPublishInfo `json:"publishInfo,omitempty" url:"publishInfo,omitempty"`
 
@@ -1302,6 +1399,7 @@ const (
 	LanguageTypescript Language = "TYPESCRIPT"
 	LanguagePhp        Language = "PHP"
 	LanguageRust       Language = "RUST"
+	LanguageSwift      Language = "SWIFT"
 )
 
 func NewLanguageFromString(s string) (Language, error) {
@@ -1322,6 +1420,8 @@ func NewLanguageFromString(s string) (Language, error) {
 		return LanguagePhp, nil
 	case "RUST":
 		return LanguageRust, nil
+	case "SWIFT":
+		return LanguageSwift, nil
 	}
 	var t Language
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
