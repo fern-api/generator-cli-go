@@ -160,6 +160,7 @@ const (
 	StructuredFeatureIdStreaming      StructuredFeatureId = "STREAMING"
 	StructuredFeatureIdTimeouts       StructuredFeatureId = "TIMEOUTS"
 	StructuredFeatureIdCustomClient   StructuredFeatureId = "CUSTOM_CLIENT"
+	StructuredFeatureIdContributing   StructuredFeatureId = "CONTRIBUTING"
 )
 
 func NewStructuredFeatureIdFromString(s string) (StructuredFeatureId, error) {
@@ -182,6 +183,8 @@ func NewStructuredFeatureIdFromString(s string) (StructuredFeatureId, error) {
 		return StructuredFeatureIdTimeouts, nil
 	case "CUSTOM_CLIENT":
 		return StructuredFeatureIdCustomClient, nil
+	case "CONTRIBUTING":
+		return StructuredFeatureIdContributing, nil
 	}
 	var t StructuredFeatureId
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -947,11 +950,14 @@ type ReadmeConfig struct {
 	Remote                *Remote       `json:"remote,omitempty" url:"remote,omitempty"`
 	Language              *LanguageInfo `json:"language,omitempty" url:"language,omitempty"`
 	Organization          string        `json:"organization" url:"organization"`
+	ApiName               *string       `json:"apiName,omitempty" url:"apiName,omitempty"`
 	BannerLink            *string       `json:"bannerLink,omitempty" url:"bannerLink,omitempty"`
 	Introduction          *string       `json:"introduction,omitempty" url:"introduction,omitempty"`
 	ApiReferenceLink      *string       `json:"apiReferenceLink,omitempty" url:"apiReferenceLink,omitempty"`
 	ReferenceMarkdownPath *string       `json:"referenceMarkdownPath,omitempty" url:"referenceMarkdownPath,omitempty"`
 	Requirements          []string      `json:"requirements,omitempty" url:"requirements,omitempty"`
+	DisabledFeatures      []*FeatureId  `json:"disabledFeatures,omitempty" url:"disabledFeatures,omitempty"`
+	WhiteLabel            *bool         `json:"whiteLabel,omitempty" url:"whiteLabel,omitempty"`
 	// Specifies the list of features supported by a specific generator.
 	// The features are rendered in the order they're specified.
 	Features []*ReadmeFeature `json:"features,omitempty" url:"features,omitempty"`
