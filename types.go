@@ -367,6 +367,49 @@ func (c *CsharpInfo) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
+type CustomSection struct {
+	Name     string   `json:"name" url:"name"`
+	Language Language `json:"language" url:"language"`
+	Content  string   `json:"content" url:"content"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (c *CustomSection) GetExtraProperties() map[string]interface{} {
+	return c.extraProperties
+}
+
+func (c *CustomSection) UnmarshalJSON(data []byte) error {
+	type unmarshaler CustomSection
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CustomSection(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+
+	c._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CustomSection) String() string {
+	if len(c._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(c._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
 type GithubRemote struct {
 	// A full repo url (i.e. https://github.com/fern-api/fern)
 	RepoUrl string `json:"repoUrl" url:"repoUrl"`
@@ -947,17 +990,18 @@ func (p *PythonInfo) String() string {
 // that comes from each generator (i.e. features, requirements, and more).
 type ReadmeConfig struct {
 	// If specified, the original README.md will be fetched from this remote (if it exists).
-	Remote                *Remote       `json:"remote,omitempty" url:"remote,omitempty"`
-	Language              *LanguageInfo `json:"language,omitempty" url:"language,omitempty"`
-	Organization          string        `json:"organization" url:"organization"`
-	ApiName               *string       `json:"apiName,omitempty" url:"apiName,omitempty"`
-	BannerLink            *string       `json:"bannerLink,omitempty" url:"bannerLink,omitempty"`
-	Introduction          *string       `json:"introduction,omitempty" url:"introduction,omitempty"`
-	ApiReferenceLink      *string       `json:"apiReferenceLink,omitempty" url:"apiReferenceLink,omitempty"`
-	ReferenceMarkdownPath *string       `json:"referenceMarkdownPath,omitempty" url:"referenceMarkdownPath,omitempty"`
-	Requirements          []string      `json:"requirements,omitempty" url:"requirements,omitempty"`
-	DisabledFeatures      []*FeatureId  `json:"disabledFeatures,omitempty" url:"disabledFeatures,omitempty"`
-	WhiteLabel            *bool         `json:"whiteLabel,omitempty" url:"whiteLabel,omitempty"`
+	Remote                *Remote          `json:"remote,omitempty" url:"remote,omitempty"`
+	Language              *LanguageInfo    `json:"language,omitempty" url:"language,omitempty"`
+	Organization          string           `json:"organization" url:"organization"`
+	ApiName               *string          `json:"apiName,omitempty" url:"apiName,omitempty"`
+	BannerLink            *string          `json:"bannerLink,omitempty" url:"bannerLink,omitempty"`
+	Introduction          *string          `json:"introduction,omitempty" url:"introduction,omitempty"`
+	ApiReferenceLink      *string          `json:"apiReferenceLink,omitempty" url:"apiReferenceLink,omitempty"`
+	ReferenceMarkdownPath *string          `json:"referenceMarkdownPath,omitempty" url:"referenceMarkdownPath,omitempty"`
+	Requirements          []string         `json:"requirements,omitempty" url:"requirements,omitempty"`
+	DisabledFeatures      []*FeatureId     `json:"disabledFeatures,omitempty" url:"disabledFeatures,omitempty"`
+	WhiteLabel            *bool            `json:"whiteLabel,omitempty" url:"whiteLabel,omitempty"`
+	CustomSections        []*CustomSection `json:"customSections,omitempty" url:"customSections,omitempty"`
 	// Specifies the list of features supported by a specific generator.
 	// The features are rendered in the order they're specified.
 	Features []*ReadmeFeature `json:"features,omitempty" url:"features,omitempty"`
