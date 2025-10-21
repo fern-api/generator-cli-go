@@ -410,6 +410,29 @@ func (c *CustomSection) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
+// Controls the verbosity of usage examples in README generation
+type ExampleStyle string
+
+const (
+	ExampleStyleMinimal       ExampleStyle = "minimal"
+	ExampleStyleComprehensive ExampleStyle = "comprehensive"
+)
+
+func NewExampleStyleFromString(s string) (ExampleStyle, error) {
+	switch s {
+	case "minimal":
+		return ExampleStyleMinimal, nil
+	case "comprehensive":
+		return ExampleStyleComprehensive, nil
+	}
+	var t ExampleStyle
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (e ExampleStyle) Ptr() *ExampleStyle {
+	return &e
+}
+
 type GithubRemote struct {
 	// A full repo url (i.e. https://github.com/fern-api/fern)
 	RepoUrl string `json:"repoUrl" url:"repoUrl"`
@@ -1005,6 +1028,8 @@ type ReadmeConfig struct {
 	// Specifies the list of features supported by a specific generator.
 	// The features are rendered in the order they're specified.
 	Features []*ReadmeFeature `json:"features,omitempty" url:"features,omitempty"`
+	// Controls whether usage examples show only required parameters (minimal) or all parameters (comprehensive). Defaults to comprehensive.
+	ExampleStyle *ExampleStyle `json:"exampleStyle,omitempty" url:"exampleStyle,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
