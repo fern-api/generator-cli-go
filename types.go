@@ -285,6 +285,74 @@ func (c *CargoPublishInfo) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
+// A code snippet that will be wrapped in a code fence with the specified language.
+// If no language is specified, the generator's language will be used.
+type CodeSnippet struct {
+	// Discriminator field to identify this as a code snippet.
+	Content string `json:"content" url:"content"`
+	// The language for the code fence. If not specified, the generator's language will be used.
+	Language *string `json:"language,omitempty" url:"language,omitempty"`
+	type_    string
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (c *CodeSnippet) GetExtraProperties() map[string]interface{} {
+	return c.extraProperties
+}
+
+func (c *CodeSnippet) Type() string {
+	return c.type_
+}
+
+func (c *CodeSnippet) UnmarshalJSON(data []byte) error {
+	type embed CodeSnippet
+	var unmarshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*c = CodeSnippet(unmarshaler.embed)
+	c.type_ = "code"
+
+	extraProperties, err := core.ExtractExtraProperties(data, *c, "type")
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+
+	c._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CodeSnippet) MarshalJSON() ([]byte, error) {
+	type embed CodeSnippet
+	var marshaler = struct {
+		embed
+		Type string `json:"type"`
+	}{
+		embed: embed(*c),
+		Type:  "code",
+	}
+	return json.Marshal(marshaler)
+}
+
+func (c *CodeSnippet) String() string {
+	if len(c._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(c._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
 type ComposerPublishInfo struct {
 	PackageName string `json:"packageName" url:"packageName"`
 
@@ -438,6 +506,8 @@ type GithubRemote struct {
 	RepoUrl string `json:"repoUrl" url:"repoUrl"`
 	// The token used to clone the GitHub repository.
 	InstallationToken string `json:"installationToken" url:"installationToken"`
+	// The branch to clone from. If not specified, the default branch will be used.
+	Branch *string `json:"branch,omitempty" url:"branch,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -759,6 +829,71 @@ func (l *LanguageInfo) Accept(visitor LanguageInfoVisitor) error {
 	return fmt.Errorf("type %T does not define a non-empty union type", l)
 }
 
+// A markdown snippet that will be rendered as-is without code fences.
+type MarkdownSnippet struct {
+	// Discriminator field to identify this as a markdown snippet.
+	Content string `json:"content" url:"content"`
+	type_   string
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (m *MarkdownSnippet) GetExtraProperties() map[string]interface{} {
+	return m.extraProperties
+}
+
+func (m *MarkdownSnippet) Type() string {
+	return m.type_
+}
+
+func (m *MarkdownSnippet) UnmarshalJSON(data []byte) error {
+	type embed MarkdownSnippet
+	var unmarshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*m = MarkdownSnippet(unmarshaler.embed)
+	m.type_ = "markdown"
+
+	extraProperties, err := core.ExtractExtraProperties(data, *m, "type")
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+
+	m._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarkdownSnippet) MarshalJSON() ([]byte, error) {
+	type embed MarkdownSnippet
+	var marshaler = struct {
+		embed
+		Type string `json:"type"`
+	}{
+		embed: embed(*m),
+		Type:  "markdown",
+	}
+	return json.Marshal(marshaler)
+}
+
+func (m *MarkdownSnippet) String() string {
+	if len(m._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(m._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
 type MavenPublishInfo struct {
 	Artifact string `json:"artifact" url:"artifact"`
 	Group    string `json:"group" url:"group"`
@@ -1075,7 +1210,7 @@ type ReadmeFeature struct {
 	Description *string    `json:"description,omitempty" url:"description,omitempty"`
 	Addendum    *string    `json:"addendum,omitempty" url:"addendum,omitempty"`
 	Advanced    *bool      `json:"advanced,omitempty" url:"advanced,omitempty"`
-	Snippets    []string   `json:"snippets,omitempty" url:"snippets,omitempty"`
+	Snippets    []*Snippet `json:"snippets,omitempty" url:"snippets,omitempty"`
 	// If true, the feature block should be rendered even if we don't receive a snippet for it.
 	// This is useful for features that are always supported, but might not require a snippet
 	// to explain.
@@ -1283,6 +1418,66 @@ func (r *RustInfo) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", r)
+}
+
+// A snippet that can be either a plain string (treated as code in the generator's language),
+// markdown content, or a code block with optional language override.
+// Plain strings are supported for backwards compatibility.
+type Snippet struct {
+	String          string
+	MarkdownSnippet *MarkdownSnippet
+	CodeSnippet     *CodeSnippet
+}
+
+func (s *Snippet) UnmarshalJSON(data []byte) error {
+	var valueString string
+	if err := json.Unmarshal(data, &valueString); err == nil {
+		s.String = valueString
+		return nil
+	}
+	valueMarkdownSnippet := new(MarkdownSnippet)
+	if err := json.Unmarshal(data, &valueMarkdownSnippet); err == nil {
+		s.MarkdownSnippet = valueMarkdownSnippet
+		return nil
+	}
+	valueCodeSnippet := new(CodeSnippet)
+	if err := json.Unmarshal(data, &valueCodeSnippet); err == nil {
+		s.CodeSnippet = valueCodeSnippet
+		return nil
+	}
+	return fmt.Errorf("%s cannot be deserialized as a %T", data, s)
+}
+
+func (s Snippet) MarshalJSON() ([]byte, error) {
+	if s.String != "" {
+		return json.Marshal(s.String)
+	}
+	if s.MarkdownSnippet != nil {
+		return json.Marshal(s.MarkdownSnippet)
+	}
+	if s.CodeSnippet != nil {
+		return json.Marshal(s.CodeSnippet)
+	}
+	return nil, fmt.Errorf("type %T does not include a non-empty union type", s)
+}
+
+type SnippetVisitor interface {
+	VisitString(string) error
+	VisitMarkdownSnippet(*MarkdownSnippet) error
+	VisitCodeSnippet(*CodeSnippet) error
+}
+
+func (s *Snippet) Accept(visitor SnippetVisitor) error {
+	if s.String != "" {
+		return visitor.VisitString(s.String)
+	}
+	if s.MarkdownSnippet != nil {
+		return visitor.VisitMarkdownSnippet(s.MarkdownSnippet)
+	}
+	if s.CodeSnippet != nil {
+		return visitor.VisitCodeSnippet(s.CodeSnippet)
+	}
+	return fmt.Errorf("type %T does not include a non-empty union type", s)
 }
 
 type SwiftInfo struct {
