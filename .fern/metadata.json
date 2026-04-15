@@ -6,6 +6,6 @@
     "union": "v1",
     "packageName": "generatorcli"
   },
-  "originGitCommit": "702136e1c88de11d11deaeadfc0075c3ed666f93",
-  "sdkVersion": "v0.9.7"
+  "originGitCommit": "884f369236f37cf54dbf7d1bde7955f57194cc97",
+  "sdkVersion": "v0.9.8"
 }
